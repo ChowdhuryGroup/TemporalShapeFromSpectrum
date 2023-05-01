@@ -1,0 +1,68 @@
+(*Units will be nm, fs - Written by Conrad Kuz - inspiration from \
+https://www.phys.ksu.edu/personal/washburn/Teaching/Class%20Files/NQO/\
+Tutorials/Tutorial8_FFT.pdf*)
+c = 300; (*Speed of light*)
+
+lambda0 = 800; (*Central wavelength in nm*)
+
+w0 = 2*\[Pi]*c/lambda0  ; (*Central frequency*)
+
+lTow[l_] := 2*\[Pi]*c/l; (*Convert wavelength to frequency*)
+
+(*Spectral phase coefficients*)
+a1 = -20;
+a2 = -00;
+a3 = -60000;
+a4 = 0;
+
+(*Spectral intensity with phase*)
+
+phi[w_] := -(a1*(w - w0) + a2/2*(w - w0)^2 + a3/6*(w - w0)^3 + 
+     a4/24*(w - w0)^4); (*format dazzler uses for phase*)
+
+A[w_] := Exp[-((w - w0)/(lTow[750] - lTow[800]))^6]; (*super gaussian*)
+
+spectral[w_] := A[w]*Exp[I*phi[w]];
+
+Overlay[{Plot[A[lTow[x]]^2*x^2/(2*\[Pi]*c), {x, 700, 900}, 
+   Frame -> True, 
+   FrameLabel -> {"Wavelength (nm)", "Spectral Intensity"}], 
+  Plot[phi[lTow[x]], {x, 700, 900}, PlotRange -> {-10, 10}, 
+   PlotStyle -> {Dashed, Red}, Axes -> False, 
+   PlotLegends -> Placed["Phase", After]]}]
+
+(*Plot[A[lTow[l]],{l,700,900}]*) (*Plot spectrum amplitude*)
+
+(*Determine step size for fourier transform*)
+
+num = 2^15; (*steps to divide by*)
+
+range = 20000 ;(*time in fs*)
+\[Delta]t = range/num;
+\[Delta]w = 2 \[Pi]/(num*\[Delta]t);
+
+(*Tables made up of time step*)
+
+time = Table[(j - (num/2))*\[Delta]t, {j, 1, num}];
+freq = Table[(j - (num/2))*\[Delta]w, {j, 1, num}];
+absfreq = Table[freq[[j]] + w0, {j, 1, num}];
+
+ewdata = Table[
+   spectral[absfreq[[j]]], {j, 1, num}]; (*Discretize spectrum*)
+
+etdata = Chop[
+   RotateRight[InverseFourier[ewdata], 
+    num/2]]; (*Actual fourier transform, rotateright shifts peak to \
+center, chop deletes numbers close to zero*)
+
+Itdata = etdata*Conjugate[etdata];
+
+
+Show[ListLinePlot[Itdata], ListLinePlot[Re[etdata], PlotStyle -> Red],
+  PlotRange -> {{16200, 16500}, 
+   All}] (*plot both results*)
+ListLinePlot[
+ Table[{time[[j]], Itdata[[j]]}, {j, 1, num}], 
+ PlotRange -> {{-400, 400}, All}, Frame -> True, 
+ FrameLabel -> {"Time (fs)", 
+   "Intensity a.u."}] (*Plot closeup intensity*)
